@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import streamlit as st
-#import yfinance as yf
+import yfinance as yf
 import pandas as pd
 import altair as alt
 
@@ -35,47 +35,116 @@ Easily compare stocks against others in their peer group.
 cols = st.columns([1, 3])
 # Will declare right cell later to avoid showing it when no data.
 
-#DEFAULT_STOCKS = ["AAPL", "MSFT", "GOOGL", "NVDA", "AMZN", "TSLA", "META"]
+STOCKS = [
+    "AAPL",
+    "ABBV",
+    "ACN",
+    "ADBE",
+    "ADP",
+    "AMD",
+    "AMGN",
+    "AMT",
+    "AMZN",
+    "APD",
+    "AVGO",
+    "AXP",
+    "BA",
+    "BK",
+    "BKNG",
+    "BMY",
+    "BRK.B",
+    "BSX",
+    "C",
+    "CAT",
+    "CI",
+    "CL",
+    "CMCSA",
+    "COST",
+    "CRM",
+    "CSCO",
+    "CVX",
+    "DE",
+    "DHR",
+    "DIS",
+    "DUK",
+    "ELV",
+    "EOG",
+    "EQR",
+    "FDX",
+    "GD",
+    "GE",
+    "GILD",
+    "GOOG",
+    "GOOGL",
+    "HD",
+    "HON",
+    "HUM",
+    "IBM",
+    "ICE",
+    "INTC",
+    "ISRG",
+    "JNJ",
+    "JPM",
+    "KO",
+    "LIN",
+    "LLY",
+    "LMT",
+    "LOW",
+    "MA",
+    "MCD",
+    "MDLZ",
+    "META",
+    "MMC",
+    "MO",
+    "MRK",
+    "MSFT",
+    "NEE",
+    "NFLX",
+    "NKE",
+    "NOW",
+    "NVDA",
+    "ORCL",
+    "PEP",
+    "PFE",
+    "PG",
+    "PLD",
+    "PM",
+    "PSA",
+    "REGN",
+    "RTX",
+    "SBUX",
+    "SCHW",
+    "SLB",
+    "SO",
+    "SPGI",
+    "T",
+    "TJX",
+    "TMO",
+    "TSLA",
+    "TXN",
+    "UNH",
+    "UNP",
+    "UPS",
+    "V",
+    "VZ",
+    "WFC",
+    "WM",
+    "WMT",
+    "XOM",
+]
 
-# Load fund data from test.xlsx, get fund names from first row, get date from first column, get fund values from the rest
-fund_file = pd.read_excel("test.xlsx", engine="openpyxl", index_col=0)
-fund_file.index.name = "Date"
-fund_file.columns.name = "Ticker"
-last_date = fund_file.index.max()
+DEFAULT_STOCKS = ["AAPL", "MSFT", "GOOGL", "NVDA", "AMZN", "TSLA", "META"]
 
-FUNDS = fund_file.columns.tolist()[1:]
-fund_value = {}
-for fund_name in FUNDS:
-    fund_value[fund_name] = {}
-    
-for index, row in fund_file.iterrows():
-    date = row.iloc[0]  # First column is date
-    if pd.notna(date):  # Skip rows with empty dates
-        for i, fund_name in enumerate(FUNDS):
-            value = row.iloc[i + 1]  # Fund values start from second column
-            if pd.notna(value):  # Only store non-empty values
-                fund_value[fund_name][date] = value
-
-DEFAULT_FUNDS = FUNDS = list(fund_value.keys())
-# Extract first non-NaN value from each row (excluding the date column)
-first_non_nan_values = fund_file.iloc[0]
-#print(first_non_nan_values)
-for index in range(len(first_non_nan_values)):
-    val = first_non_nan_values.iloc[index]
-    if pd.isna(val):
-        for col in fund_file.iloc[:, index]:
-            if pd.notna(col):
-                first_non_nan_values.iloc[index] = col
-                break
-#print("First non-NaN values in the first row:", first_non_nan_values)
 
 def stocks_to_str(stocks):
     return ",".join(stocks)
 
+
 if "tickers_input" not in st.session_state:
     st.session_state.tickers_input = st.query_params.get(
-        "funds", stocks_to_str(DEFAULT_FUNDS)
+        "stocks", stocks_to_str(DEFAULT_STOCKS)
     ).split(",")
+
 
 # Callback to update query param when input changes
 def update_query_param():
@@ -83,6 +152,7 @@ def update_query_param():
         st.query_params["stocks"] = stocks_to_str(st.session_state.tickers_input)
     else:
         st.query_params.pop("stocks", None)
+
 
 top_left_cell = cols[0].container(
     border=True, height="stretch", vertical_alignment="center"
@@ -92,7 +162,7 @@ with top_left_cell:
     # Selectbox for stock tickers
     tickers = st.multiselect(
         "Stock tickers",
-        options=sorted(set(FUNDS) | set(st.session_state.tickers_input)),
+        options=sorted(set(STOCKS) | set(st.session_state.tickers_input)),
         default=st.session_state.tickers_input,
         placeholder="Choose stocks to compare. Example: NVDA",
         accept_new_options=True,
@@ -100,13 +170,13 @@ with top_left_cell:
 
 # Time horizon selector
 horizon_map = {
-    "1 Months": pd.Timedelta(days=30),
-    "3 Months": pd.Timedelta(days=90),
-    "6 Months": pd.Timedelta(days=180),
-    "1 Year": pd.Timedelta(days=365),
-    "5 Years": pd.Timedelta(days=1825),
-    "10 Years": pd.Timedelta(days=3650),
-    "20 Years": pd.Timedelta(days=7300),
+    "1 Months": "1mo",
+    "3 Months": "3mo",
+    "6 Months": "6mo",
+    "1 Year": "1y",
+    "5 Years": "5y",
+    "10 Years": "10y",
+    "20 Years": "20y",
 }
 
 with top_left_cell:
@@ -138,16 +208,19 @@ right_cell = cols[1].container(
 
 @st.cache_resource(show_spinner=False, ttl="6h")
 def load_data(tickers, period):
-    data = fund_file[fund_file.index >= (last_date - period)]
+    tickers_obj = yf.Tickers(tickers)
+    data = tickers_obj.history(period=period)
     if data is None:
         raise RuntimeError("YFinance returned no data.")
-    return data
+    return data["Close"]
+
 
 # Load the data
 try:
     data = load_data(tickers, horizon_map[horizon])
-except Exception as e:
-    right_cell.error(f"Error loading data: {e}")
+except yf.exceptions.YFRateLimitError as e:
+    st.warning("YFinance is rate-limiting us :(\nTry again later.")
+    load_data.clear()  # Remove the bad cache entry.
     st.stop()
 
 empty_columns = data.columns[data.isna().all()].tolist()
@@ -157,7 +230,7 @@ if empty_columns:
     st.stop()
 
 # Normalize prices (start at 1)
-normalized = data.div(first_non_nan_values)
+normalized = data.div(data.iloc[0])
 
 latest_norm_values = {normalized[ticker].iat[-1]: ticker for ticker in tickers}
 max_norm_value = max(latest_norm_values.items())
@@ -280,7 +353,7 @@ for i, ticker in enumerate(tickers):
 """
 ## Raw data
 """
-
-#fund_file
-#print(fund_file)
-#print(fund_file.iloc[0])
+print(data.iloc[0])
+print(type(data))
+print(data.columns.names)
+data
